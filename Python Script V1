@@ -1,0 +1,73 @@
+
+"""
+Created on Wed Aug 30 11:18:09 2023
+
+@author: baxterkrug
+"""
+
+import os
+import fitz
+import openpyxl
+import re
+from openpyxl import Workbook
+from tkinter import filedialog, Tk
+
+def extract_content_by_metadata(pdf_path):
+    doc = fitz.open(pdf_path)
+    contents = {}
+    patterns = {
+        'Section': r'Section:\s*(.*)',
+        'Meeting Times': r'Meeting Times:\s*(.*)',
+        'Meeting Location': r'Meeting Location:\s*(.*)',
+        'Instructor': r'Instructor:\s*(.*)',
+        'Email': r'Email:\s*(.*)',
+        'Office Location': r'Office Location:\s*(.*)',
+        'Office Hours': r'Office Hours:\s*(.*)',
+    }
+
+    full_text = ""
+    for page in doc:
+        full_text += page.get_text("text")
+
+    for key, pattern in patterns.items():
+        match = re.search(pattern, full_text, re.MULTILINE)
+        if match:
+            contents[key] = match.group(1).strip()
+
+    return contents
+
+def save_to_excel(file_path, file_name, contents):
+    if not os.path.exists(file_path):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Syllabus Check Shortcut"
+        headers = ["Date"] + list(contents.keys())
+        ws.append(headers)
+        wb.save(file_path)
+
+    wb = openpyxl.load_workbook(file_path)
+    ws = wb["Syllabus Check Shortcut"]
+    data_row = [os.path.basename(file_name)] + list(contents.values())
+    ws.append(data_row)
+    wb.save(file_path)
+
+def main():
+    root = Tk()
+    root.withdraw()
+    folder_path = filedialog.askdirectory(title="Select Folder with Syllabi")
+    excel_file_path = os.path.join(folder_path, "Syllabus Check Shortcut.xlsx")
+
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.pdf'):
+            print(f"Processing {file_name}...")
+            file_path = os.path.join(folder_path, file_name)
+            try:
+                contents = extract_content_by_metadata(file_path)
+                save_to_excel(excel_file_path, file_name, contents)
+            except Exception as e:
+                print(f"Error processing {file_name}: {e}")
+
+    print("Completed!")
+
+if __name__ == "__main__":
+    main()
